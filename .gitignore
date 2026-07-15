@@ -1,0 +1,11 @@
+build/
+*.elf
+*.bin
+*.hex
+*.uf2
+*.map
+*.dis
+*.raw
+*.gray
+.DS_Store
+Thumbs.db

@@ -1,0 +1,133 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 71330eb..13c5667 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -19,6 +19,7 @@ add_subdirectory(libs/onewili)
+ add_subdirectory(apps/hello_audio)
+ add_subdirectory(apps/hello_cc1101)
+ add_subdirectory(apps/hello_display)
++add_subdirectory(apps/orca_browser)
+ add_subdirectory(apps/hello_ir)
+ add_subdirectory(apps/hello_mics)
+ add_subdirectory(apps/hello_sensors)
+diff --git a/bsp/audio/audio_i2s_duplex.c b/bsp/audio/audio_i2s_duplex.c
+index 54520ba..6b72bac 100644
+--- a/bsp/audio/audio_i2s_duplex.c
++++ b/bsp/audio/audio_i2s_duplex.c
+@@ -9,12 +9,32 @@
+ #include "hardware/clocks.h"
+ #include "hardware/gpio.h"
+ #include "hardware/dma.h"
++#include "hardware/irq.h"
+ #include "i2s_duplex.pio.h"
+ 
+ #define DPX_PIO pio0
+ #define DPX_SM  0
+ 
++#define STREAM_CHUNK 8192u
++
+ static int s_tx_dma[2] = { -1, -1 };
++static const uint32_t *s_stream_buf;
++static uint32_t s_stream_frames, s_stream_next;
++static bool s_stream_irq_added;
++
++static void audio_tx_dma_irq(void) {
++    uint32_t pending = dma_hw->ints0;
++    for (int i = 0; i < 2; i++) {
++        if (s_tx_dma[i] >= 0 && (pending & (1u << s_tx_dma[i]))) {
++            dma_hw->ints0 = 1u << s_tx_dma[i];
++            if (s_stream_buf) {
++                dma_channel_set_read_addr(s_tx_dma[i], s_stream_buf + s_stream_next, false);
++                dma_channel_set_trans_count(s_tx_dma[i], STREAM_CHUNK, false);
++                s_stream_next = (s_stream_next + STREAM_CHUNK) % s_stream_frames;
++            }
++        }
++    }
++}
+ 
+ void audio_i2s_duplex_init(uint32_t sample_rate) {
+     // MCLK = 256*fs, 50% duty (codec MCLK-direct).
+@@ -86,7 +106,27 @@ void audio_i2s_duplex_play_loop(const uint32_t *buf, uint frames) {
+     dma_channel_start(s_tx_dma[0]);
+ }
+ 
++void audio_i2s_duplex_play_stream_loop(const uint32_t *buf, uint frames) {
++    if (s_tx_dma[0] < 0) { s_tx_dma[0] = dma_claim_unused_channel(true); s_tx_dma[1] = dma_claim_unused_channel(true); }
++    s_stream_buf = buf; s_stream_frames = frames; s_stream_next = 2u * STREAM_CHUNK;
++    uint tx_dreq = pio_get_dreq(DPX_PIO, DPX_SM, true);
++    if (!s_stream_irq_added) {
++        irq_add_shared_handler(DMA_IRQ_0, audio_tx_dma_irq, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
++        s_stream_irq_added = true;
++    }
++    for (int i = 0; i < 2; i++) {
++        dma_channel_config c = dma_channel_get_default_config(s_tx_dma[i]);
++        channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
++        channel_config_set_read_increment(&c, true); channel_config_set_write_increment(&c, false);
++        channel_config_set_dreq(&c, tx_dreq); channel_config_set_chain_to(&c, s_tx_dma[i ^ 1]);
++        dma_channel_configure(s_tx_dma[i], &c, &DPX_PIO->txf[DPX_SM], buf + i * STREAM_CHUNK, STREAM_CHUNK, false);
++        dma_channel_set_irq0_enabled(s_tx_dma[i], true);
++    }
++    irq_set_enabled(DMA_IRQ_0, true); dma_channel_start(s_tx_dma[0]);
++}
++
+ void audio_i2s_duplex_play_stop(void) {
++    s_stream_buf = NULL;
+     for (int i = 0; i < 2; i++)
+         if (s_tx_dma[i] >= 0) dma_channel_abort(s_tx_dma[i]);
+     // Clear the TX FIFO so the DAC sits at mid-scale (silence) during the baseline.
+diff --git a/bsp/audio/audio_i2s_duplex.h b/bsp/audio/audio_i2s_duplex.h
+index eeea760..8a8cd68 100644
+--- a/bsp/audio/audio_i2s_duplex.h
++++ b/bsp/audio/audio_i2s_duplex.h
+@@ -17,6 +17,7 @@ uint audio_i2s_duplex_rx_dreq(void);
+ // to the TX FIFO forever. `buf` MUST be aligned to its byte size and the byte size
+ // MUST be a power of two (ring requirement). For 64 frames -> 256 bytes, aligned(256).
+ void audio_i2s_duplex_play_loop(const uint32_t *buf, uint frames);
++void audio_i2s_duplex_play_stream_loop(const uint32_t *buf, uint frames);
+ 
+ // Stop playback: abort the TX DMA and clear the TX FIFO (DAC mid-scale silence).
+ void audio_i2s_duplex_play_stop(void);
+diff --git a/bsp/audio/codec_nau88c10.c b/bsp/audio/codec_nau88c10.c
+index 5b2dfdf..80a7c5c 100644
+--- a/bsp/audio/codec_nau88c10.c
++++ b/bsp/audio/codec_nau88c10.c
+@@ -128,6 +128,14 @@ void codec_nau88c10_set_output(codec_out_t out) {
+     }
+ }
+ 
++void codec_nau88c10_speaker_low_power(void) {
++    codec_write(0x0a, 0x0040);          // soft-mute DAC
++    codec_write(0x36, NAU_36_SPK_MUTE); // mute speaker output
++    codec_write(0x38, NAU_38_HP_OFF);   // headphone amp off
++    codec_write(0x45, 0x0000);          // disable 5V speaker boost
++    codec_write(0x03, 0x0029);          // output drivers off; keep core bias path
++    DIAG("codec: speaker low power\n");
++}
+ void codec_nau88c10_dump(void) {
+     // Vendor readID(): register N is read by addressing byte N<<1 (9-bit regs).
+     for (uint8_t reg = 0; reg <= 0x45; reg++) {
+diff --git a/bsp/audio/codec_nau88c10.h b/bsp/audio/codec_nau88c10.h
+index 210991b..a3645f0 100644
+--- a/bsp/audio/codec_nau88c10.h
++++ b/bsp/audio/codec_nau88c10.h
+@@ -27,6 +27,9 @@ typedef enum { CODEC_OUT_SPEAKER = 0, CODEC_OUT_HEADPHONE = 1 } codec_out_t;
+ // codec state (the UI reflects it); on-device validation is pending.
+ void codec_nau88c10_set_output(codec_out_t out);
+ 
++// Mute and power down the speaker output stage and 5V boost.
++void codec_nau88c10_speaker_low_power(void);
++
+ // Log the output-routing registers (R3/0x03, R54/0x36 spk vol, R56/0x38 HP enable,
+ // R69/0x45 spk boost) over RTT — used to confirm a set_output() switch took effect.
+ void codec_nau88c10_log_output(void);
+diff --git a/tools/openocd/freewili2.cfg b/tools/openocd/freewili2.cfg
+index 486a20c..bc6fa5f 100644
+--- a/tools/openocd/freewili2.cfg
++++ b/tools/openocd/freewili2.cfg
+@@ -5,5 +5,6 @@
+ # OpenOCD's script search path. The `fw` CLI passes `-s <pico-sdk openocd
+ # scripts dir>` automatically; if you invoke openocd by hand, add that -s too.
+ source [find interface/cmsis-dap.cfg]
++cmsis-dap usb interface 0
+ adapter speed 5000
+ source [find target/rp2350.cfg]
