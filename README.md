@@ -6,7 +6,7 @@ An educational LVGL app for the [Free Wili 2](https://freewili.com/) handheld. I
 
 ## Features
 
-- 71 sourced orca stories organized into four sections
+- 72 sourced orca stories organized into four sections, including a whale-research donation QR
 - Runtime-generated QR codes for sources and videos
 - Real ocean and Southern Alaskan orca recordings
 - Compact grayscale/red artwork decoded into PSRAM
@@ -20,6 +20,10 @@ An educational LVGL app for the [Free Wili 2](https://freewili.com/) handheld. I
 - The [Free Wili BSP](https://github.com/evaderkrub/wilibsp)
 - Raspberry Pi Pico SDK and the toolchain required by the BSP
 - CMSIS-DAP connection to the display-side RP2350B
+
+## Prebuilt firmware
+
+Download [orca-field-notes-freewili2.uf2](releases/orca-field-notes-freewili2.uf2) for a ready-to-flash build. It targets the display-side RP2350B in Free Wili 2.
 
 ## Install into the BSP
 
@@ -60,6 +64,7 @@ python tools/fw.py flash orca_browser
 apps/orca_browser/               LVGL application and embedded assets
 patches/wilibsp-integration.patch BSP audio and OpenOCD integration
 docs/appscreenshot.png           Hardware screenshot
+releases/*.uf2                   Ready-to-flash firmware
 AGENTS.md                         Guidance for coding agents
 ```
 
@@ -72,4 +77,3 @@ AGENTS.md                         Guidance for coding agents
 ## License
 
 Code and original project materials are released under the [MIT License](LICENSE). Third-party factual sources, linked media, trademarks, and recordings remain subject to their respective terms. Free Wili and its logo are trademarks of their respective owner.
-
