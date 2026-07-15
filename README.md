@@ -23,7 +23,7 @@ An educational LVGL app for the [Free Wili 2](https://freewili.com/) handheld. I
 
 ## Prebuilt firmware
 
-Download [orca-field-notes-freewili2.uf2](releases/orca-field-notes-freewili2.uf2) for a ready-to-flash build. It targets the display-side RP2350B in Free Wili 2.
+Download [orca-field-notes-freewili2.uf2](https://github.com/evaderkrub/freewili2-orca-field-notes/releases/latest/download/orca-field-notes-freewili2.uf2) for a ready-to-flash build. It targets the display-side RP2350B in Free Wili 2.
 
 ## Install into the BSP
 
@@ -64,7 +64,7 @@ python tools/fw.py flash orca_browser
 apps/orca_browser/               LVGL application and embedded assets
 patches/wilibsp-integration.patch BSP audio and OpenOCD integration
 docs/appscreenshot.png           Hardware screenshot
-releases/*.uf2                   Ready-to-flash firmware
+GitHub Releases                  Ready-to-flash UF2 firmware
 AGENTS.md                         Guidance for coding agents
 ```
 
