@@ -17,7 +17,7 @@ An educational LVGL app for the [Free Wili 2](https://freewili.com/) handheld. I
 ## Requirements
 
 - Free Wili 2 hardware
-- The [Free Wili BSP](https://github.com/evaderkrub/wilibsp)
+- The [Free Wili BSP](https://github.com/freewili/wilibsp)
 - Raspberry Pi Pico SDK and the toolchain required by the BSP
 - CMSIS-DAP connection to the display-side RP2350B
 
@@ -30,7 +30,7 @@ Download [orca-field-notes-freewili2.uf2](https://github.com/freewili/freewili2-
 Clone both repositories next to each other, then copy the app into the BSP and apply the integration patch:
 
 ```powershell
-git clone https://github.com/evaderkrub/wilibsp.git
+git clone https://github.com/freewili/wilibsp.git
 git clone https://github.com/freewili/freewili2-orca-field-notes.git
 
 Copy-Item -Recurse -Force freewili2-orca-field-notes\apps\orca_browser wilibsp\apps\
