@@ -23,7 +23,7 @@ An educational LVGL app for the [Free Wili 2](https://freewili.com/) handheld. I
 
 ## Prebuilt firmware
 
-Download [orca-field-notes-freewili2.uf2](https://github.com/evaderkrub/freewili2-orca-field-notes/releases/latest/download/orca-field-notes-freewili2.uf2) for a ready-to-flash build. It targets the display-side RP2350B in Free Wili 2.
+Download [orca-field-notes-freewili2.uf2](https://github.com/freewili/freewili2-orca-field-notes/releases/latest/download/orca-field-notes-freewili2.uf2) for a ready-to-flash build. It targets the display-side RP2350B in Free Wili 2.
 
 ## Install into the BSP
 
@@ -31,7 +31,7 @@ Clone both repositories next to each other, then copy the app into the BSP and a
 
 ```powershell
 git clone https://github.com/evaderkrub/wilibsp.git
-git clone https://github.com/evaderkrub/freewili2-orca-field-notes.git
+git clone https://github.com/freewili/freewili2-orca-field-notes.git
 
 Copy-Item -Recurse -Force freewili2-orca-field-notes\apps\orca_browser wilibsp\apps\
 Set-Location wilibsp
